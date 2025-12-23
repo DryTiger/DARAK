@@ -1,4 +1,4 @@
-/* Retro Room Theme - 80s Arcade / DVD Rental Vibe */
+/* Retro Room Theme - 80s Arcade VHS Vibe */
 :root {
   /* Palette */
   --bg-dark: #121212;
@@ -2502,8 +2502,7 @@ body::after,
   justify-content: center;
   cursor: pointer;
   color: #fff;
-  /* Default white */
-  opacity: 0.7;
+  opacity: 0.3;
   transition: opacity 0.3s, transform 0.3s;
 }
 
@@ -2511,7 +2510,6 @@ body::after,
   opacity: 1;
   transform: scale(1.1);
   color: var(--accent-neon-blue);
-  /* Optional hover glow */
 }
 
 /* Friend List Modal Styles */
