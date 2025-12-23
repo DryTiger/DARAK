@@ -127,37 +127,34 @@
     <!-- Settings View (New) -->
     <div id="settingsView" class="view-section" style="display: none;">
       <h2 class="month-year">Settings</h2>
-      <div class="view-content" style="padding: 20px; color: var(--text-color);">
+      <div class="settings-card"
+        style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+        <h3 style="color: var(--accent-neon-blue); margin-bottom: 15px;">Data Management</h3>
+        <p style="margin-bottom: 15px; color: #aaa;">Export your data as a JSON file for backup or restore it from a
+          previous save.
+        </p>
 
-        <div class="settings-card"
-          style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
-          <h3 style="color: var(--accent-neon-blue); margin-bottom: 15px;">Data Management</h3>
-          <p style="margin-bottom: 15px; color: #aaa;">Export your data as a JSON file for backup or restore it from a
-            previous save.
-          </p>
-
-          <div style="display: flex; gap: 10px;">
-            <button class="neon-button" onclick="window.exportJSON()">
-              Export Data
-            </button>
-            <button class="neon-button" onclick="document.getElementById('importFileSetting').click()">
-              Import Data
-            </button>
-            <input type="file" id="importFileSetting" style="display: none;" accept=".json"
-              onchange="window.importJSON(event)">
-          </div>
-        </div>
-
-        <div class="settings-card"
-          style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
-          <h3 style="color: var(--accent-gold); margin-bottom: 15px;">About</h3>
-          <p style="color: #aaa;">DARAK: A room for your memories.</p>
-          <p style="color: #666; font-size: 0.8em; margin-top: 10px;">NetworkMedia Final Project (20230987)</p>
-          <p style="color: #666; font-size: 0.8em; margin-top: 10px;">Version 1.2.0</p>
-        </div>
-
+        <button class="save-btn" onclick="window.exportJSON()" style="margin-top: 0; margin-right: 10px; flex: 1;">
+          Export Data
+        </button>
+        <button class="save-btn" onclick="document.getElementById('importFileSetting').click()"
+          style="margin-top: 0; flex: 1; background: #333; color: white;">
+          Import Data
+        </button>
+        <input type="file" id="importFileSetting" style="display: none;" accept=".json"
+          onchange="window.importJSON(event)">
       </div>
+
+      <div class="settings-card"
+        style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+        <h3 style="color: var(--accent-gold); margin-bottom: 15px;">About</h3>
+        <p style="color: #aaa;">DARAK: A room for your memories.</p>
+        <p style="color: #666; font-size: 0.8em; margin-top: 10px;">NetworkMedia Final Project (20230987)</p>
+        <p style="color: #666; font-size: 0.8em; margin-top: 10px;">Version 1.2.0</p>
+      </div>
+
     </div>
+  </div>
   </div>
 
   <!-- Floating Sidebar -->
@@ -193,7 +190,7 @@
       </svg>
     </button>
     <!-- Ticket Gallery Button -->
-    <button class="sidebar-btn" onclick="switchView('gallery')" title="Ticket Storage">
+    <button class="sidebar-btn" onclick="switchView('gallery')" title="Ticket Archive">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M4 6h16v12H4z"></path>
         <line x1="8" y1="6" x2="8" y2="18" stroke-dasharray="2 2"></line>
@@ -228,6 +225,11 @@
           <div class="form-group">
             <label class="form-label">Date</label>
             <input type="date" class="form-input" id="recordDate" required readonly>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Release Year</label>
+            <input type="number" class="form-input" id="recordReleaseYear" placeholder="e.g. 1999">
           </div>
 
           <div class="form-group">

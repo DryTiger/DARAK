@@ -730,6 +730,10 @@ function openModal(dateStr, existingRecord = null) {
   if (locInput) locInput.value = '';
   renderTags('location', []);
 
+  // Clear Release Year
+  const yearInput = document.getElementById('recordReleaseYear');
+  if (yearInput) yearInput.value = '';
+
   updateStars(0);
   updateMoods(''); // Clear mood selection
 
@@ -751,6 +755,9 @@ function openModal(dateStr, existingRecord = null) {
 
     document.getElementById('recordTitle').value = existingRecord.title || ''; // Handle Title
     document.getElementById('recordLocation').value = existingRecord.location || '';
+    if (document.getElementById('recordReleaseYear')) {
+      document.getElementById('recordReleaseYear').value = existingRecord.releaseYear || '';
+    }
     document.getElementById('recordReview').value = existingRecord.review || '';
     document.getElementById('ratingValue').value = existingRecord.rating || 0;
     updateStars(existingRecord.rating || 0);
@@ -899,6 +906,7 @@ function saveRecord(event) {
     title: document.getElementById('recordTitle').value, // Save Title
     category: category,
     location: document.getElementById('recordLocation').value,
+    releaseYear: document.getElementById('recordReleaseYear').value, // Save Release Year
     rating: document.getElementById('ratingValue').value,
     mood: document.getElementById('recordMood').value,
     review: document.getElementById('recordReview').value,
@@ -1388,41 +1396,61 @@ function renderBookshelf() {
       const spine = document.createElement('div');
       spine.className = 'book-spine';
 
-      // Visual Differentiation: Books vs DVDs
-      const dvdCategories = ['영화', '드라마', '애니메이션', 'Movie', 'Drama', 'Animation', 'DVD'];
-      const isDVD = dvdCategories.includes(item.category);
-      if (isDVD) {
+      // Visual Differentiation: Books vs DVDs vs VHS (Movies/Drama)
+      const vhsCategories = ['영화', '드라마', 'Movie', 'Drama', 'movie', 'drama'];
+      const dvdCategories = ['애니메이션', 'Animation', 'DVD'];
+
+      const isVHS = vhsCategories.includes(item.category);
+      const isDVD = !isVHS && dvdCategories.includes(item.category); // DVD only if not VHS preference
+
+      if (isVHS) {
+        spine.classList.add('type-vhs');
+      } else if (isDVD) {
         spine.classList.add('type-dvd');
       } else {
         spine.classList.add('type-book');
       }
 
-      spine.textContent = item.title;
       spine.title = item.title;
 
       // Randomize Visuals
       if (!item.color) {
         item.color = bookColors[Math.floor(Math.random() * bookColors.length)];
-        localStorage.setItem('spacelog_bucketlist', JSON.stringify(bucketList));
+        // Ideally we should save back to prevent flickering, which is done by checking bucketList existence
+        saveNeeded = true;
       }
       const randomColor = item.color;
 
-      // DVDs are generally shorter/uniform height, Books vary more
+      // Dimensions
       let randomHeight, randomWidth;
 
-      if (isDVD) {
-        randomHeight = 90; // Fixed DVD height
-        randomWidth = 35 + Math.floor(Math.random() * 5); // DVDs are uniform width 
+      if (isVHS) {
+        randomHeight = 94; // Fixed VHS Height
+        randomWidth = 42; // Fixed VHS Width
+      } else if (isDVD) {
+        randomHeight = 90;
+        randomWidth = 35 + Math.floor(Math.random() * 5);
       } else {
-        randomHeight = 88 + Math.floor(Math.random() * 12); // Books vary
-        randomWidth = 35 + Math.floor(Math.random() * 25); // Books vary width
+        randomHeight = 88 + Math.floor(Math.random() * 12);
+        randomWidth = 35 + Math.floor(Math.random() * 25);
       }
 
       spine.style.setProperty('--book-color', randomColor);
       spine.style.height = `${randomHeight}%`;
-      spine.style.width = `${randomWidth}px`; // Override CSS width
+      spine.style.width = `${randomWidth}px`;
+      spine.style.flex = 'none';
 
-      spine.style.flex = 'none'; // Ensure width applies
+      // Inner Content
+      if (isVHS) {
+        // VHS Structure: Frame is the spine (black), inner is label
+        const label = document.createElement('div');
+        label.className = 'vhs-label';
+        label.textContent = item.title;
+        spine.appendChild(label);
+      } else {
+        // Standard Book/DVD
+        spine.textContent = item.title;
+      }
 
       spine.onclick = () => handleBucketClick(startIdx + idx);
       if (item.completed) spine.style.opacity = '0.3';
@@ -1442,6 +1470,11 @@ function renderBookshelf() {
     }
 
     container.appendChild(shelf);
+  }
+
+  // Save if new colors were generated to prevent flickering
+  if (saveNeeded) {
+    localStorage.setItem('spacelog_bucketlist', JSON.stringify(bucketList));
   }
 }
 
@@ -2110,9 +2143,9 @@ function openTicketPreview(dataUrl, filename, ticketId = null) {
     delBtn.id = 'deleteTicketBtn';
     delBtn.className = 'save-btn'; // Use existing class for shape/shadow
     // Override colors for destructive action
-    delBtn.style.background = 'linear-gradient(135deg, #ff2a6d, #b00e3a)';
-    delBtn.style.boxShadow = '0 4px 15px rgba(255, 42, 109, 0.4)';
-    delBtn.style.color = '#333';
+    delBtn.style.background = '#4a4a4a';
+    delBtn.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.4)';
+    delBtn.style.color = '#fff';
     delBtn.style.marginTop = '0'; // Reset any margins if needed contextually differently
     delBtn.textContent = 'Delete Ticket';
 
@@ -2671,10 +2704,10 @@ function renderSettings() {
           <p style="margin-bottom: 15px; color: #aaa;">Export your data for backup or restore it from a previous save.</p>
           
           <div style="display: flex; gap: 10px;">
-            <button class="neon-button" onclick="window.exportJSON()" style="padding: 10px 20px; background: var(--accent-neon-blue); border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
-              Export Data (JSON)
+            <button class="save-btn" onclick="window.exportJSON()" style="margin-top: 0; flex: 1;">
+              Export Data
             </button>
-            <button class="neon-button" onclick="document.getElementById('importFileSetting').click()" style="padding: 10px 20px; background: #333; color: white; border: 1px solid #555; border-radius: 8px; font-weight: bold; cursor: pointer;">
+            <button class="save-btn" onclick="document.getElementById('importFileSetting').click()" style="margin-top: 0; flex: 1; background: #333; color: white;">
               Import Data
             </button>
             <input type="file" id="importFileSetting" style="display: none;" accept=".json" onchange="window.importJSON(event)">
