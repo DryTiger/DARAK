@@ -35,7 +35,7 @@
         <div class="category-tab">공연</div>
         <div class="category-tab">전시</div>
         <div class="category-tab">+</div>
-        <div class="category-tab edit-mode-btn" onclick="toggleCategoryEdit()" title="Remove Category">✎</div>
+        <div class="category-tab edit-mode-btn" onclick="toggleCategoryEdit()" title="Edit Category">✎</div>
       </div>
     </div>
 
@@ -127,8 +127,22 @@
     <!-- Settings View (New) -->
     <div id="settingsView" class="view-section" style="display: none;">
       <h2 class="month-year">Settings</h2>
+
+      <!-- Account Section -->
       <div class="settings-card"
         style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+        <h3 style="color: var(--accent-neon-blue); margin-bottom: 15px;">Account</h3>
+        <div id="accountInfoDisplay" style="margin-bottom: 15px; color: #eee;">
+          <!-- Filled by JS -->
+          Loading...
+        </div>
+        <button onclick="UserManager.logout()" class="delete-btn"
+          style="background: #333; font-size: 0.9em; padding: 10px 20px; width: auto;">Logout</button>
+      </div>
+
+      <div class="settings-card"
+        style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+
         <h3 style="color: var(--accent-neon-blue); margin-bottom: 15px;">Data Management</h3>
         <p style="margin-bottom: 15px; color: #aaa;">Export your data as a JSON file for backup or restore it from a
           previous save.
@@ -347,6 +361,13 @@
 
           <input type="hidden" id="recordId">
 
+          <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+            <input type="checkbox" id="recordShared"
+              style="width: 20px; height: 20px; accent-color: var(--accent-neon-blue);">
+            <label for="recordShared" style="color: #ccc; cursor: pointer;">Share with Friends</label>
+          </div>
+
+
           <div class="modal-footer" style="display: flex; gap: 10px; margin-top: 20px;">
             <button type="button" class="delete-btn" onclick="deleteCurrentRecord()"
               style="background: #e53e3e; color: white; border: none; padding: 15px; border-radius: 10px; flex: 1; display: none;"
@@ -510,6 +531,20 @@
     </div>
   </div>
 
+  <!-- Friend List Modal (Dummy) -->
+  <div class="modal-overlay" id="friendListModal" style="z-index: 20000;">
+    <div class="modal-content retro-popup" style="max-width: 400px; text-align: center;">
+      <h3 style="color: var(--accent-neon-blue); margin-bottom: 25px;">MEMORIES LINKED</h3>
+      <div id="dummyFriendList" class="friend-list-container">
+        <!-- JS will populate this -->
+      </div>
+      <div class="popup-buttons vertical" style="margin-top: 20px;">
+        <button onclick="closeFriendListModal()" class="cancel-btn" style="width: 100%;">Close</button>
+      </div>
+    </div>
+  </div>
+
+
 
 
   <!-- Ticket HTML Template (Hidden) -->
@@ -545,6 +580,37 @@
       <div class="ticket-footer-bar">
         <span>COLLECT YOUR MOMENTS</span>
         <span class="barcode-font">||| ||| || |||</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Overlay (Computer Screen) -->
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-container">
+      <img src="computer_overlay.png" alt="Retro Computer" class="computer-img">
+      <div class="screen-content" style="margin-top: 50px;">
+        <h2
+          style="font-family: 'Orbitron', sans-serif; color: var(--accent-neon-blue); margin-bottom: 20px; text-shadow: 0 0 5px var(--accent-neon-blue);">
+          SYSTEM LOGIN</h2>
+        <div class="form-group" style="margin-bottom: 15px;">
+          <input type="text" id="loginId" class="form-input" placeholder="ID (Username)"
+            style="background: rgba(0,0,0,0.5); text-align: center;">
+        </div>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <input type="password" id="loginPw" class="form-input" placeholder="PASSWORD"
+            style="background: rgba(0,0,0,0.5); text-align: center;">
+        </div>
+        <button onclick="handleLogin()" class="save-btn"
+          style="width: 45%; padding: 10px; font-size: 1.1em; background: var(--accent-neon-blue); color: #000; box-shadow: 0 0 15px var(--accent-neon-blue);">ENTER
+          YOUR DARAK</button>
+        <p id="loginError"
+          style="color: #ff2a6d; margin-top: 15px; font-size: 0.9em; min-height: 1.2em; text-shadow: 0 0 5px #ff2a6d;">
+        </p>
+
+        <p style="margin-top: 15px; font-size: 1em; color: #888;">
+          New User? <span onclick="handleRegister()"
+            style="color: var(--accent-gold); cursor: pointer; text-decoration: underline;">Create ID</span>
+        </p>
       </div>
     </div>
   </div>

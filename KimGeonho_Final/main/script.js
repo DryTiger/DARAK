@@ -2,6 +2,87 @@
 let currentDate = new Date();
 let selectedCategory = '영화';
 
+// --- User Manager (Auth & Friends) ---
+const UserManager = {
+  getUsers() {
+    return JSON.parse(localStorage.getItem('darak_users')) || [];
+  },
+
+  saveUsers(users) {
+    localStorage.setItem('darak_users', JSON.stringify(users));
+  },
+
+  getCurrentUser() {
+    return JSON.parse(localStorage.getItem('darak_current_user'));
+  },
+
+  isLoggedIn() {
+    return !!this.getCurrentUser();
+  },
+
+  login(id, password) {
+    const users = this.getUsers();
+    const user = users.find(u => u.id === id && u.password === password);
+    if (user) {
+      localStorage.setItem('darak_current_user', JSON.stringify(user));
+      window.location.reload(); // Reload to clear overlay/refresh state
+      return true;
+    }
+    return false;
+  },
+
+  register(id, password) {
+    const users = this.getUsers();
+    if (users.find(u => u.id === id)) {
+      return { success: false, message: 'ID already exists' };
+    }
+    const newUser = { id, password, friends: [] }; // Simple User Model
+    users.push(newUser);
+    this.saveUsers(users);
+    // Auto login after register? Or require login. Requirement says "After successful login".
+    // Let's auto-login for better UX.
+    this.login(id, password);
+    return { success: true };
+  },
+
+  logout() {
+    localStorage.removeItem('darak_current_user');
+    window.location.reload();
+  },
+
+  addFriend(friendId) {
+    const currentUser = this.getCurrentUser();
+    if (!currentUser) return false;
+
+    // Refresh user data from storage to be safe
+    const users = this.getUsers();
+    const userIndex = users.findIndex(u => u.id === currentUser.id);
+    if (userIndex === -1) return false;
+
+    const user = users[userIndex];
+
+    if (user.id === friendId) return { success: false, message: "Cannot add yourself." };
+    if (user.friends.includes(friendId)) return { success: false, message: "Already friends." };
+
+    // Verify friend exists
+    if (!users.find(u => u.id === friendId)) return { success: false, message: "User not found." };
+
+    user.friends.push(friendId);
+    users[userIndex] = user;
+    this.saveUsers(users);
+
+    // Update session too
+    localStorage.setItem('darak_current_user', JSON.stringify(user));
+    return { success: true };
+  },
+
+  getFriends() {
+    const currentUser = this.getCurrentUser();
+    return currentUser ? currentUser.friends : [];
+  }
+};
+
+
 // --- Database Logic (IndexedDB) ---
 let db;
 let dbInitialized = new Promise((resolve, reject) => {
@@ -61,7 +142,26 @@ async function dbSaveRecord(record) {
   await dbInitialized;
   return new Promise((resolve, reject) => {
     try {
+      // Auth Check: exist currentUser?
+      const currentUser = UserManager.getCurrentUser();
+
+      // If new record, assign owner
+      if (!record.userId && currentUser) {
+        record.userId = currentUser.id;
+      }
+      // If updating, owner should already be there. 
+      // If legacy record (no owner), assign to current user updating it.
+      if (!record.userId && currentUser) {
+        record.userId = currentUser.id;
+      }
+
+      // Initialize sharedWith if missing
+      if (!record.sharedWith) {
+        record.sharedWith = [];
+      }
+
       const tx = db.transaction([STORE_NAME], "readwrite");
+
       const store = tx.objectStore(STORE_NAME);
       const req = store.put(record);
       req.onsuccess = () => resolve(true);
@@ -139,6 +239,14 @@ async function dbGetAllTickets() {
 async function loadAllRecords() {
   try {
     await initDB();
+
+    // AUTH GATE
+    const currentUser = UserManager.getCurrentUser();
+
+    // If NOT logged in, we shouldn't show records OR we initiate the Login Overlay flow.
+    // The Overlay will block view anyway.
+    // But for security/logic, we only load records relevant to user.
+
   } catch (e) {
     console.error("Critical: Database failed to load.", e);
     // Show the EXACT error to the user
@@ -161,7 +269,52 @@ async function loadAllRecords() {
 
   if (db) {
     try {
-      records = await dbGetAllRecords();
+      const allRecords = await dbGetAllRecords();
+      const currentUser = UserManager.getCurrentUser();
+
+      if (currentUser) {
+        // FILTER: My records OR Shared with me
+        records = allRecords.filter(r => {
+          // 1. My record
+          if (r.userId === currentUser.id) return true;
+          // 2. Legacy record (claim it? or just show it? Plan said assign legacy to first user)
+          if (!r.userId) {
+            // Auto-claim legacy records for the first logged in user encountering them?
+            // Or just show them. Let's just show them for now to avoid accidental data mutation on load.
+            // Actually, to make "My Records" work, we should probably treat them as mine.
+            // Let's allow legacy records (undefined userId) to be visible to everyone or just current.
+            // Simplest: Treat undefined as mine.
+            return true;
+          }
+          // 3. Shared with me (simple array check or "ALL_FRIENDS")
+          if (r.sharedWith && (r.sharedWith.includes(currentUser.id) || r.sharedWith.includes('ALL_FRIENDS'))) {
+            // Check if I am a friend of the owner? 
+            // Logic: If sharedWith includes 'ALL_FRIENDS', check if owner has me as friend?
+            // Or simpler: If the record says 'ALL_FRIENDS', is the owner in MY friend list? 
+            // Usually 'ALL_FRIENDS' means "I share this with all my friends". 
+            // So if I am the viewer, is the owner my friend?
+            // Let's assume friendship is reciprocal or just check if owner is in my friend list?
+            // Actually, clearer logic: 
+            // If r.userId is in MY friends list AND r.sharedWith includes 'ALL_FRIENDS' -> Show.
+            if (r.sharedWith.includes('ALL_FRIENDS')) {
+              // Is owner my friend?
+              return currentUser.friends.includes(r.userId);
+            }
+            return true;
+          }
+          return false;
+        });
+
+        // Claim Legacy records (Optional cleanup)
+        // const legacy = allRecords.filter(r => !r.userId);
+        // if (legacy.length > 0) {
+        //    legacy.forEach(async r => { r.userId = currentUser.id; await dbSaveRecord(r); });
+        // }
+      } else {
+        // Not logged in -> No records
+        records = [];
+      }
+
     } catch (e) {
       console.error("Error fetching records", e);
     }
@@ -222,8 +375,24 @@ async function loadAllTickets() {
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
-  loadAllRecords(); // Async Load
-  loadAllTickets(); // Async Load Tickets
+
+  // --- AUTH CHECK ---
+  if (UserManager.isLoggedIn()) {
+    // Hide Overlay if Logged In
+    const overlay = document.getElementById('loginOverlay');
+    if (overlay) overlay.classList.add('hidden');
+
+    // Load Data
+    loadAllRecords();
+    loadAllTickets();
+  } else {
+    // Not logged in. Overlay stays visible. 
+    // Data is NOT loaded until login.
+    // Ensure Overlay is visible (in case CSS hidden it by default?) - CSS has it visible by default.
+  }
+
+  // loadAllRecords(); // Async Load -- MOVED INSIDE AUTH CHECK
+  // loadAllTickets(); // Async Load Tickets -- MOVED INSIDE AUTH CHECK
 
   switchView('calendar');
   // renderCalendar(); // Moved to loadAllRecords
@@ -231,6 +400,62 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCategoryFields();
   renderTicketWall();
 });
+
+// --- Auth Handlers ---
+function handleLogin() {
+  const idInput = document.getElementById('loginId');
+  const pwInput = document.getElementById('loginPw');
+  const errorMsg = document.getElementById('loginError');
+
+  const id = idInput.value.trim();
+  const pw = pwInput.value.trim();
+
+  if (!id || !pw) {
+    errorMsg.textContent = "Please enter ID and Passphrase.";
+    return;
+  }
+
+  if (UserManager.login(id, pw)) {
+    // Success -> Reload happens in login()
+  } else {
+    errorMsg.textContent = "Access Denied. Invalid Credentials.";
+    // Shake effect?
+    const container = document.querySelector('.login-container');
+    container.style.animation = 'none';
+    container.offsetHeight; /* trigger reflow */
+    container.style.animation = 'shake 0.5s';
+  }
+}
+
+function handleRegister() {
+  const idInput = document.getElementById('loginId');
+  const pwInput = document.getElementById('loginPw');
+  const errorMsg = document.getElementById('loginError');
+
+  const id = idInput.value.trim();
+  const pw = pwInput.value.trim();
+
+  if (!id || !pw) {
+    errorMsg.textContent = "Enter ID and PW to create account.";
+    return;
+  }
+
+  const result = UserManager.register(id, pw);
+  if (result.success) {
+    // Success -> Reload happens in register -> login
+  } else {
+    errorMsg.textContent = result.message;
+  }
+}
+
+// Keypress Enter for Login
+document.getElementById('loginId')?.addEventListener('keypress', function (e) {
+  if (e.key === 'Enter') document.getElementById('loginPw').focus();
+});
+document.getElementById('loginPw')?.addEventListener('keypress', function (e) {
+  if (e.key === 'Enter') handleLogin();
+});
+
 
 function setupEventListeners() {
   // Category Tabs
@@ -274,8 +499,70 @@ function setupEventListeners() {
   });
 }
 
+// --- Friend Logic ---
+function openFriendListModal() {
+  const modal = document.getElementById('friendListModal');
+  const container = document.getElementById('dummyFriendList');
+
+  // Dummy Data
+  const friends = [
+    { name: 'Alice', id: 'alice_01' },
+    { name: 'Bob', id: 'bob_the_builder' },
+    { name: 'Charlie', id: 'charlie_brown' }
+  ];
+
+  container.innerHTML = '';
+
+  friends.forEach(f => {
+    const item = document.createElement('div');
+    item.className = 'friend-item';
+
+    item.innerHTML = `
+      <div class="friend-name">${f.name}</div>
+      <button class="view-calendar-btn" onclick="console.log('View Calendar clicked for ${f.name}')">View Calendar</button>
+    `;
+
+    container.appendChild(item);
+  });
+
+  modal.classList.add('active');
+}
+
+// Expose to window to ensure reachability
+window.openFriendListModal = openFriendListModal;
+
+function closeFriendListModal() {
+  document.getElementById('friendListModal').classList.remove('active');
+}
+
+
+function handleConnectFriend() {
+
+  const input = document.getElementById('addFriendInput');
+  const msg = document.getElementById('addFriendMsg');
+  const friendId = input.value.trim();
+
+  if (!friendId) {
+    msg.textContent = "Please enter a User ID.";
+    msg.style.color = "#ff2a6d";
+    return;
+  }
+
+  const result = UserManager.addFriend(friendId);
+  if (result.success) {
+    msg.textContent = `Success! You are now connected with ${friendId}.`;
+    msg.style.color = "var(--accent-neon-blue)";
+    input.value = '';
+    // Update local session if needed? Already handled in UserManager.
+  } else {
+    msg.textContent = result.message;
+    msg.style.color = "#ff2a6d";
+  }
+}
+
 // Custom Category Logic
 let customCategories = JSON.parse(localStorage.getItem('spacelog_categories')) || [];
+
 
 function renderCategoryTabs() {
   const container = document.querySelector('.category-tabs');
@@ -301,10 +588,37 @@ function renderCategoryTabs() {
   editBtn.className = 'category-tab edit-mode-btn';
   editBtn.textContent = '✎';
   editBtn.onclick = toggleCategoryEdit;
-  editBtn.title = 'Remove Category';
+  editBtn.title = 'Edit Category';
   container.appendChild(editBtn);
 
+  // --- Add Friend Button (Next to Edit) ---
+  const friendBtn = document.createElement('div');
+  friendBtn.className = 'icon-btn-plain'; // New Plain Style
+  // SVG Icon (User Group)
+  friendBtn.innerHTML = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </svg>
+  `;
+
+  friendBtn.id = 'friend-list-btn'; // Unique ID for debugging/styling
+
+  friendBtn.title = 'Friend List';
+  friendBtn.addEventListener('click', (e) => {
+    console.log("Friend Button Clicked");
+    e.stopPropagation(); // Prevent bubbling issues
+    openFriendListModal();
+  });
+
+  container.appendChild(friendBtn);
+
+
+
   // Apply deletable class if in edit mode
+
   if (document.body.classList.contains('category-edit-mode')) {
     document.querySelectorAll('.category-tab:not(.edit-mode-btn)').forEach(tab => {
       if (tab.textContent !== '+') tab.classList.add('deletable');
@@ -778,7 +1092,14 @@ function openModal(dateStr, existingRecord = null) {
       }
     }
 
+    // Sharing State
+    const shareBox = document.getElementById('recordShared');
+    if (shareBox) {
+      shareBox.checked = existingRecord.sharedWith && existingRecord.sharedWith.includes('ALL_FRIENDS');
+    }
+
     // Fill dynamic fields
+
     if (existingRecord.details) {
       Object.keys(existingRecord.details).forEach(key => {
         const input = document.getElementById(`field_${key}`);
@@ -914,8 +1235,11 @@ function saveRecord(event) {
     image: imagePreview.src !== '' && imagePreview.style.display !== 'none' ? imagePreview.src : null,
     youtube: document.getElementById('recordYoutube').value,
     audio: currentAudioFile,
-    dominantColor: imagePreview.style.display !== 'none' ? getDominantColor(imagePreview) : null
+    dominantColor: imagePreview.style.display !== 'none' ? getDominantColor(imagePreview) : null,
+    // Sharing
+    sharedWith: document.getElementById('recordShared')?.checked ? ['ALL_FRIENDS'] : []
   };
+
 
   // Optimize Update Logic: Find by ID first to handle Date changes correctly
   let existingIndex = -1;
@@ -2519,16 +2843,6 @@ function importJSON(event) {
       if (data.categories) localStorage.setItem('spacelog_categories', JSON.stringify(data.categories));
 
       // 2. Clear & Restore IndexedDB
-      // We can't easily "clear all" without helper, but we can loop delete or just put overwrite?
-      // Since it's a restore, we might want to wipe first to avoid duplicates/orphans.
-      // For simplicity in this scope, we'll overwrite by ID. If IDs conflict, they update. Use new IDs if necessary?
-      // User said "restore previously saved data". Usually implies "reset to this state".
-      // Let's rely on wiping manually or just adding. wiping is safer for "restore".
-
-      // Since 'records' is sync'd on load, clearing DB is best.
-      // But we don't have a clearDB function.
-      // We'll iterate current 'records' and delete them? Expensive if many.
-      // Let's just 'put' all imported records.
 
       console.log("Restoring Records...", data.records ? data.records.length : 0);
       if (data.records) {
@@ -2697,6 +3011,16 @@ function renderSettings() {
     console.warn("Settings view was empty. Restoring static content.");
     container.innerHTML = `
       <h2 class="month-year">Settings</h2>
+      
+      <!-- Account Section -->
+      <div class="settings-card" style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+        <h3 style="color: var(--accent-neon-blue); margin-bottom: 15px;">Account</h3>
+        <div id="accountInfoDisplay" style="margin-bottom: 15px; color: #eee;">
+           Loading...
+        </div>
+        <button onclick="UserManager.logout()" class="delete-btn" style="background: #333; font-size: 0.9em; padding: 10px 20px; width: auto;">Logout</button>
+      </div>
+
       <div class="view-content" style="padding: 20px; color: var(--text-color);">
         
         <div class="settings-card" style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
@@ -2723,7 +3047,23 @@ function renderSettings() {
       </div>
     `;
   }
+
+  // Populate Account Info
+  const accountDisplay = document.getElementById('accountInfoDisplay');
+  if (accountDisplay) {
+    const user = UserManager.getCurrentUser();
+    if (user) {
+      const friendCount = user.friends ? user.friends.length : 0;
+      accountDisplay.innerHTML = `
+         <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 5px;">${user.id}</div>
+         <div style="color: #aaa; font-size: 0.9em;">Friends: ${friendCount}</div>
+       `;
+    } else {
+      accountDisplay.textContent = "Not Logged In";
+    }
+  }
 }
+
 
 // Window Expose
 window.renderSettings = renderSettings;
