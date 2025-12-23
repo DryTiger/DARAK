@@ -796,12 +796,6 @@ h1 {
   opacity: 1;
 }
 
-#settingsView {
-  min-height: 400px;
-  position: relative;
-  z-index: 10;
-}
-
 /* Ticket Styles */
 .ticket-visual {
   width: 380px;

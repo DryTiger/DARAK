@@ -127,20 +127,20 @@
     <!-- Settings View (New) -->
     <div id="settingsView" class="view-section" style="display: none;">
       <h2 class="month-year">Settings</h2>
-      <div class="view-content" style="padding: 20px; color: var(--text-main);">
+      <div class="view-content" style="padding: 20px; color: var(--text-color);">
 
         <div class="settings-card"
-          style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border); margin-bottom: 20px;">
+          style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
           <h3 style="color: var(--accent-neon-blue); margin-bottom: 15px;">Data Management</h3>
-          <p style="margin-bottom: 15px; color: #aaa;">Export your data for backup or restore it from a previous save.
+          <p style="margin-bottom: 15px; color: #aaa;">Export your data as a JSON file for backup or restore it from a
+            previous save.
           </p>
 
           <div style="display: flex; gap: 10px;">
-            <button class="save-btn" onclick="window.exportJSON()" style="margin: 0; flex: 1;">
-              Export Data (JSON)
+            <button class="neon-button" onclick="window.exportJSON()">
+              Export Data
             </button>
-            <button class="save-btn" onclick="document.getElementById('importFileSetting').click()"
-              style="margin: 0; flex: 1; background: var(--accent-gold); color: #000;">
+            <button class="neon-button" onclick="document.getElementById('importFileSetting').click()">
               Import Data
             </button>
             <input type="file" id="importFileSetting" style="display: none;" accept=".json"
@@ -149,10 +149,11 @@
         </div>
 
         <div class="settings-card"
-          style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border);">
+          style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
           <h3 style="color: var(--accent-gold); margin-bottom: 15px;">About</h3>
           <p style="color: #aaa;">DARAK: A room for your memories.</p>
-          <p style="color: #666; font-size: 0.8em; margin-top: 10px;">Version 1.2.0 (IndexedDB Enabled)</p>
+          <p style="color: #666; font-size: 0.8em; margin-top: 10px;">NetworkMedia Final Project (20230987)</p>
+          <p style="color: #666; font-size: 0.8em; margin-top: 10px;">Version 1.2.0</p>
         </div>
 
       </div>
@@ -485,37 +486,6 @@
         <button onclick="confirmAddCategory()" class="save-btn"
           style="width: 100%; margin-bottom: 10px;">Create</button>
         <button onclick="closeAddCategoryModal()" class="cancel-btn" style="width: 100%;">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  </div>
-  </div>
-  </div>
-
-  <!-- Import Options Modal -->
-  <div class="modal-overlay" id="importOptionsModal" style="z-index: 2147483647 !important;">
-    <div class="modal-content retro-popup"
-      style="max-width: 450px; text-align: center; border: 1px solid var(--accent-neon-blue);">
-      <h3 style="color: var(--accent-neon-blue); margin-bottom: 20px;">Import Data Options</h3>
-      <p style="color: #ccc; margin-bottom: 25px;">How would you like to handle the imported data?</p>
-
-      <div class="popup-buttons vertical" style="gap: 15px;">
-        <button onclick="confirmImport('merge')" class="save-btn"
-          style="width: 100%; background: linear-gradient(135deg, #1cb5e0, #000851);">
-          <strong>Merge (Recommend)</strong><br>
-          <span style="font-size: 0.8em; font-weight: normal; opacity: 0.8;">Keep existing data, add new items.
-            safe.</span>
-        </button>
-
-        <button onclick="confirmImport('replace')" class="save-btn"
-          style="width: 100%; background: linear-gradient(135deg, #ff2a6d, #b00e3a); box-shadow: 0 4px 15px rgba(255,42,109,0.3);">
-          <strong>Replace All</strong><br>
-          <span style="font-size: 0.8em; font-weight: normal; opacity: 0.8;">⚠️ Overwrite current data
-            completely.</span>
-        </button>
-
-        <button onclick="closeImportOptions()" class="cancel-btn" style="width: 100%;">Cancel</button>
       </div>
     </div>
   </div>

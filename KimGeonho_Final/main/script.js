@@ -580,33 +580,33 @@ function openDailyList(dateStr, list) {
 
 
 // --- View Switching Logic ---
-currentView = 'calendar';
+// let currentView = 'calendar'; // Removed duplicate declaration
+
 
 function switchView(viewName) {
-  console.log(`Switching to view: ${viewName}`);
+  // Hide all sections
+  document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
 
-  // 1. Sidebar Active State
-  const sidebarIndices = {
+  // Update sidebar buttons
+  document.querySelectorAll('.sidebar-btn').forEach(btn => btn.classList.remove('active'));
+
+  // Logic map
+  const viewMap = {
     'calendar': 0,
     'list': 1,
     'bucket': 2,
+    'stats': -1, // No sidebar button really, but handled below
     'ticketWall': 3,
     'settings': 4
   };
 
+  const btnIndex = viewMap[viewName];
   const buttons = document.querySelectorAll('.sidebar-btn');
-  buttons.forEach(btn => btn.classList.remove('active'));
-
-  if (sidebarIndices.hasOwnProperty(viewName)) {
-    const idx = sidebarIndices[viewName];
-    if (buttons[idx]) buttons[idx].classList.add('active');
+  if (btnIndex >= 0 && buttons[btnIndex]) {
+    buttons[btnIndex].classList.add('active');
   }
 
-  // 2. Hide All Views
-  const allViews = document.querySelectorAll('.view-section');
-  allViews.forEach(el => el.style.display = 'none');
-
-  // 3. Show Target View
+  // Show selected View
   const viewIdMap = {
     'calendar': 'calendarView',
     'list': 'listView',
@@ -618,32 +618,27 @@ function switchView(viewName) {
 
   const targetId = viewIdMap[viewName];
   if (targetId) {
-    const targetEl = document.getElementById(targetId);
-    if (targetEl) {
-      targetEl.style.display = 'block';
-    } else {
-      console.error(`View element #${targetId} not found.`);
-    }
+    document.getElementById(targetId).style.display = 'block';
   }
 
-  // 4. View Specific Refresh Logic
+  // Specific Logic
   if (viewName === 'calendar') {
-    if (document.getElementById('pageTitle')) document.getElementById('pageTitle').innerText = months[currentDate.getMonth()];
+    document.getElementById('pageTitle').textContent = months[currentDate.getMonth()];
     renderCalendar();
   } else if (viewName === 'list') {
-    if (document.getElementById('pageTitle')) document.getElementById('pageTitle').innerText = 'RECORD LIST';
+    document.getElementById('pageTitle').textContent = 'RECORD LIST';
     renderListView();
   } else if (viewName === 'bucket') {
-    if (document.getElementById('pageTitle')) document.getElementById('pageTitle').innerText = 'BUCKET LIST';
+    document.getElementById('pageTitle').textContent = 'BUCKET LIST';
     renderBookshelf();
   } else if (viewName === 'stats') {
-    if (document.getElementById('pageTitle')) document.getElementById('pageTitle').innerText = 'STATISTICS';
+    document.getElementById('pageTitle').textContent = 'STATISTICS';
     renderStats();
   } else if (viewName === 'ticketWall') {
-    if (document.getElementById('pageTitle')) document.getElementById('pageTitle').innerText = 'TICKETS';
+    document.getElementById('pageTitle').textContent = 'TICKETS';
     renderTicketWall();
   } else if (viewName === 'settings') {
-    if (document.getElementById('pageTitle')) document.getElementById('pageTitle').innerText = 'SETTINGS';
+    document.getElementById('pageTitle').textContent = 'SETTINGS';
   }
 
   currentView = viewName;
@@ -1022,7 +1017,8 @@ function switchView(viewName) {
     'list': 'listView', // ID verified in HTML
     'stats': 'statsView',
     'bucket': 'bucketView',
-    'gallery': 'ticketWallView'
+    'gallery': 'ticketWallView',
+    'settings': 'settingsView'
   };
 
   const viewId = viewMap[viewName];
@@ -1046,6 +1042,7 @@ function switchView(viewName) {
   if (viewName === 'stats') renderStatistics();
   if (viewName === 'bucket') renderBookshelf();
   if (viewName === 'gallery') renderTicketWall();
+  if (viewName === 'settings') renderSettings();
 }
 
 // List View Logic
@@ -2315,187 +2312,6 @@ function removeTag(fieldId, tagToRemove) {
   input.value = tags.join(',');
   renderTags(fieldId, tags);
 }
-// --- Robust Data Management Logic ---
-
-// EXPORT: Read from DB to ensure source of truth
-async function exportJSON() {
-  try {
-    const records = await dbGetAllRecords();
-    const tickets = await dbGetAllTickets(); // Helpers from indexedDB logic
-    const bucketList = JSON.parse(localStorage.getItem('spacelog_bucketlist')) || [];
-    const categories = JSON.parse(localStorage.getItem('spacelog_categories')) || [];
-
-    const data = {
-      schemaVersion: 1.2,
-      exportDate: new Date().toISOString(),
-      records: records,
-      tickets: tickets,
-      bucketList: bucketList,
-      categories: categories
-    };
-
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `darak_backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    customAlert("Export Successful!");
-  } catch (e) {
-    console.error("Export failed:", e);
-    customAlert("Export Failed: " + e.message);
-  }
-}
-
-let pendingImportData = null;
-
-function importJSON(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    try {
-      const json = JSON.parse(e.target.result);
-
-      // Basic Validation
-      if (!json.records && !json.tickets) {
-        throw new Error("Invalid JSON structure: Missing records/tickets.");
-      }
-
-      // Version Check
-      const CURRENT_VERSION = 1.2;
-      if (json.schemaVersion && json.schemaVersion > CURRENT_VERSION) {
-        customAlert("Error: File version is newer than this app.");
-        event.target.value = '';
-        return;
-      }
-
-      // Store pending data and ask user
-      pendingImportData = json;
-      document.getElementById('importOptionsModal').classList.add('active');
-    } catch (err) {
-      console.error(err);
-      customAlert("Invalid JSON file.");
-    }
-    event.target.value = ''; // Reset input to allow re-selection
-  };
-  reader.readAsText(file);
-}
-
-function closeImportOptions() {
-  document.getElementById('importOptionsModal').classList.remove('active');
-  pendingImportData = null;
-}
-
-async function confirmImport(mode) {
-  closeImportOptions();
-  if (!pendingImportData) return;
-
-  const data = pendingImportData;
-
-  try {
-    if (mode === 'replace') {
-      // Safety Check
-      if (!confirm("⚠️ WARNING: This will DELETE all existing data. Are you sure?")) return;
-      if (!confirm("Double Check: Have you exported a backup first? Data will be lost.")) return;
-
-      // Auto-Backup to LocalStorage
-      const currentRecords = await dbGetAllRecords();
-      const currentTickets = await dbGetAllTickets();
-      localStorage.setItem('safety_backup', JSON.stringify({
-        date: new Date().toISOString(),
-        records: currentRecords,
-        tickets: currentTickets
-      }));
-      console.log("Safety backup saved to localStorage.");
-
-      // Execution: Clear DB
-      await dbClearStore('records');
-      await dbClearStore('tickets');
-
-      // Restore
-      if (data.records) {
-        for (const r of data.records) await dbSaveRecord(r);
-      }
-      if (data.tickets) {
-        for (const t of data.tickets) await dbSaveTicket(t);
-      }
-
-      // LocalStorage Items
-      if (data.bucketList) localStorage.setItem('spacelog_bucketlist', JSON.stringify(data.bucketList));
-      if (data.categories) localStorage.setItem('spacelog_categories', JSON.stringify(data.categories));
-
-      customAlert("Replace Complete! UI Refreshing...");
-
-    } else if (mode === 'merge') {
-      // Merge Strategy: New IDs to avoid collision
-      let importedCount = 0;
-
-      if (data.records) {
-        for (const r of data.records) {
-          // New ID: import_<timestamp>_<count>
-          const newId = `import_${Date.now()}_${importedCount++}`;
-          r.id = newId;
-          await dbSaveRecord(r);
-        }
-      }
-      if (data.tickets) {
-        for (const t of data.tickets) {
-          const newId = `import_${Date.now()}_${importedCount++}`;
-          t.id = newId;
-          await dbSaveTicket(t);
-        }
-      }
-
-      // Merge BucketList (Text based de-dupe)
-      if (data.bucketList) {
-        // Implementation dependent, usually simple array logic
-        // For now, let's skip complex merging of localStorage arrays to keep it simple or Append
-      }
-
-      customAlert(`Merge Complete! Added ${importedCount} items.`);
-    }
-
-    // Rehydrate UI
-    await loadAllRecords();
-    await loadAllTickets();
-    if (currentView === 'calendar') renderCalendar();
-    if (currentView === 'ticketWall') renderTicketWall();
-    if (currentView === 'list') renderListView();
-
-    // Refresh Bucket/Categories globals if needed
-    // ...
-
-  } catch (err) {
-    console.error("Import Error:", err);
-    customAlert("Error during import: " + err.message);
-  } finally {
-    pendingImportData = null;
-  }
-}
-
-// Helper Stub if not existing
-async function dbClearStore(storeName) {
-  // Assuming 'db' global or using transaction
-  return new Promise((resolve, reject) => {
-    if (!db) { reject("DB not ready"); return; }
-    const tx = db.transaction([storeName], 'readwrite');
-    const store = tx.objectStore(storeName);
-    const req = store.clear();
-    req.onsuccess = () => resolve();
-    req.onerror = (e) => reject(e);
-  });
-}
-
-// Expose functions
-window.exportJSON = exportJSON;
-window.importJSON = importJSON;
-window.confirmImport = confirmImport;
-window.closeImportOptions = closeImportOptions;
 
 
 // --- Robust Ticket Generation (Clone Method) ---
@@ -2629,7 +2445,27 @@ function downloadTicket() {
 }
 window.downloadTicket = downloadTicket;
 
+// --- Backup & Restore Logic ---
+function exportJSON() {
+  const data = {
+    records: records, // Current In-Memory Records
+    tickets: ticketGallery,
+    bucketList: JSON.parse(localStorage.getItem('spacelog_bucketlist')) || [],
+    categories: JSON.parse(localStorage.getItem('spacelog_categories')) || [],
+    config: JSON.parse(localStorage.getItem('spacelog_config')) || {},
+    exportDate: new Date().toISOString()
+  };
 
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `darak_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function importJSON(event) {
   const file = event.target.files[0];
@@ -2815,3 +2651,46 @@ async function recoverAndExportData() {
   }
 }
 window.recoverAndExportData = recoverAndExportData;
+
+
+
+/* --- Settings Render Logic --- */
+function renderSettings() {
+  const container = document.getElementById('settingsView');
+  if (!container) return;
+
+  // Check if content is empty or seemingly missing key elements
+  if (container.innerHTML.trim() === '' || !container.querySelector('.settings-card')) {
+    console.warn("Settings view was empty. Restoring static content.");
+    container.innerHTML = `
+      <h2 class="month-year">Settings</h2>
+      <div class="view-content" style="padding: 20px; color: var(--text-color);">
+        
+        <div class="settings-card" style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+          <h3 style="color: var(--accent-neon-blue); margin-bottom: 15px;">Data Management</h3>
+          <p style="margin-bottom: 15px; color: #aaa;">Export your data for backup or restore it from a previous save.</p>
+          
+          <div style="display: flex; gap: 10px;">
+            <button class="neon-button" onclick="window.exportJSON()" style="padding: 10px 20px; background: var(--accent-neon-blue); border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+              Export Data (JSON)
+            </button>
+            <button class="neon-button" onclick="document.getElementById('importFileSetting').click()" style="padding: 10px 20px; background: #333; color: white; border: 1px solid #555; border-radius: 8px; font-weight: bold; cursor: pointer;">
+              Import Data
+            </button>
+            <input type="file" id="importFileSetting" style="display: none;" accept=".json" onchange="window.importJSON(event)">
+          </div>
+        </div>
+
+        <div class="settings-card" style="background: rgba(0,0,0,0.5); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <h3 style="color: var(--accent-gold); margin-bottom: 15px;">About</h3>
+          <p style="color: #aaa;">DARAK: A room for your memories.</p>
+          <p style="color: #666; font-size: 0.8em; margin-top: 10px;">Version 1.2.1</p>
+        </div>
+
+      </div>
+    `;
+  }
+}
+
+// Window Expose
+window.renderSettings = renderSettings;
